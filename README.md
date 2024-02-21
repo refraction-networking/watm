@@ -7,6 +7,30 @@
 
 This repository contains tools for building WebAssembly Transport Modules (WATMs) for [water](https://github.com/refraction-networking/water) project. 
 
+### Cite our work
+
+If you quoted or used our work in your own project/paper/research, please cite our paper [Just add WATER: WebAssembly-based Circumvention Transports](https://www.petsymposium.org/foci/2024/foci-2024-0003.pdf), which is published in the proceedings of Free and Open Communications on the Internet (FOCI) in 2024 issue 1, pages 22-28.
+
+<details>
+  <summary>BibTeX</summary>
+    
+  ```bibtex
+    @inproceedings{water-foci24,
+        author = {Chi, Erik and Wang, Gaukas and Halderman, J. Alex and Wustrow, Eric and Wampler, Jack},
+        year = {2024},
+        month = {02},
+        number = {1},
+        pages = {22-28},
+        title = {Just add {WATER}: {WebAssembly}-based Circumvention Transports},
+        howpublished = "\url{https://www.petsymposium.org/foci/2024/foci-2024-0003.php}",
+        publisher = {PoPETs},
+        address = {Virtual Event},
+        series = {FOCI '24},
+        booktitle = {Free and Open Communications on the Internet},
+    }
+  ```
+</details>
+
 # License
 
 This project is dual-licensed under both the Apache 2.0 license and the GPLv3 license. The license applies differently depending on how this project is used.
