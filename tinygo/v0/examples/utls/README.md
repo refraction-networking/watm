@@ -6,10 +6,6 @@ This example shows how to build a fully functional TLS client with TinyGo from [
 
 Go 1.20/1.21 is required to build this example until TinyGo supports Go 1.22.
 
-```bash
-tinygo build -o utls.wasm -target=wasi -scheduler=asyncify -gc=conservative -tags=purego .
-```
-
 ### Debug
 
 ```bash

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"github.com/CosmWasm/tinyjson"
 	tls "github.com/refraction-networking/utls"
 	v0 "github.com/refraction-networking/watm/tinygo/v0"
+	"github.com/refraction-networking/watm/tinygo/v0/examples/utls/lib"
 	v0net "github.com/refraction-networking/watm/tinygo/v0/net"
 )
 
@@ -10,10 +12,21 @@ import (
 var _ v0.WrappingTransport = (*UTLSClientWrappingTransport)(nil)
 
 type UTLSClientWrappingTransport struct {
+	tlsConfig     *tls.Config
+	clientHelloID tls.ClientHelloID
 }
 
 func (uwt *UTLSClientWrappingTransport) Wrap(conn v0net.Conn) (v0net.Conn, error) {
-	tlsConn := tls.UClient(conn, &tls.Config{InsecureSkipVerify: true}, tls.HelloChrome_Auto)
+	if uwt.tlsConfig == nil {
+		uwt.tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+
+	var emptyClientHelloID tls.ClientHelloID
+	if uwt.clientHelloID == emptyClientHelloID {
+		uwt.clientHelloID = tls.HelloChrome_Auto
+	}
+
+	tlsConn := tls.UClient(conn, uwt.tlsConfig, uwt.clientHelloID)
 	if err := tlsConn.Handshake(); err != nil {
 		return nil, err
 	}
@@ -26,6 +39,20 @@ func (uwt *UTLSClientWrappingTransport) Wrap(conn v0net.Conn) (v0net.Conn, error
 		Conn:    conn,
 		tlsConn: tlsConn,
 	}, nil
+}
+
+var _ v0.ConfigurableTransport = (*UTLSClientWrappingTransport)(nil)
+
+func (uwt *UTLSClientWrappingTransport) Configure(config []byte) error {
+	configurables := &lib.Configurables{}
+	if err := tinyjson.Unmarshal(config, configurables); err != nil {
+		return err
+	}
+
+	uwt.tlsConfig = configurables.GetTLSConfig()
+	uwt.clientHelloID = configurables.GetClientHelloID()
+
+	return nil
 }
 
 type UTLSConn struct {

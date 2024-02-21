@@ -30,7 +30,7 @@ func _water_init() int32 {
 	// rct := r.ConfigurableTransport()
 	if dct != nil || lct != nil /* || rct != nil */ {
 		config, err := readConfig()
-		if err == nil {
+		if err == nil || config != nil {
 			if dct != nil {
 				dct.Configure(config)
 			}
