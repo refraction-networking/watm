@@ -7,7 +7,7 @@ replace golang.org/x/sys v0.16.0 => ./replace/x/sys
 replace github.com/refraction-networking/watm => ../../../
 
 require (
-	github.com/refraction-networking/utls v1.6.2
+	github.com/refraction-networking/utls v1.6.2-wasm
 	github.com/refraction-networking/watm v0.0.0-00010101000000-000000000000
 )
 
