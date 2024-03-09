@@ -43,8 +43,8 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        tinygo: [ "0.30.0" ] # latest tinygo version ONLY (1)
-        go: [ "1.20.x", "1.21.x" ] # latest 2 stable versions of Go. TODO: bump to 1.22.x once tinygo support added.
+        tinygo: [ "0.31.1" ] # latest tinygo version ONLY (1)
+        go: [ "1.21.x", "1.22.x" ] # latest 2 stable versions of Go. TODO: bump to 1.22.x once tinygo support added.
         examples: [ "plain", "reverse", "utls" ] # Add examples here per ones under tinygo/v0/examples
     steps:
     - uses: actions/checkout@v4
