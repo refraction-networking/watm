@@ -1,13 +1,5 @@
 package v0
 
-import (
-	"log"
-	"syscall"
-
-	v0net "github.com/refraction-networking/watm/tinygo/v0/net"
-	"github.com/refraction-networking/watm/wasip1"
-)
-
 type RelayWrapSelection bool
 
 const (
@@ -83,48 +75,4 @@ func BuildRelayWithListeningDialingTransport(lt ListeningTransport, dt DialingTr
 	// r.dt = dt
 	// r.wt = nil
 	panic("BuildRelayWithListeningDialingTransport: not implemented")
-}
-
-//export _water_associate
-func _water_associate() int32 {
-	if workerIdentity != identity_uninitialized {
-		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
-	}
-
-	if r.wt != nil {
-		var err error
-		var lis v0net.Listener = &v0net.TCPListener{}
-		sourceConn, err = lis.Accept()
-		if err != nil {
-			log.Printf("dial: v0net.Listener.Accept: %v", err)
-			return wasip1.EncodeWATERError(err.(syscall.Errno))
-		}
-
-		remoteConn, err = v0net.Dial("", "")
-		if err != nil {
-			log.Printf("dial: v0net.Dial: %v", err)
-			return wasip1.EncodeWATERError(err.(syscall.Errno))
-		}
-
-		if r.wrapSelection == RelayWrapRemote {
-			// wrap remoteConn
-			remoteConn, err = r.wt.Wrap(remoteConn.(*v0net.TCPConn))
-			// set sourceConn, the not-wrapped one, to non-blocking mode
-			sourceConn.(*v0net.TCPConn).SetNonBlock(true)
-		} else {
-			// wrap sourceConn
-			sourceConn, err = r.wt.Wrap(sourceConn.(*v0net.TCPConn))
-			// set remoteConn, the not-wrapped one, to non-blocking mode
-			remoteConn.(*v0net.TCPConn).SetNonBlock(true)
-		}
-		if err != nil {
-			log.Printf("dial: r.wt.Wrap: %v", err)
-			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
-		}
-	} else {
-		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
-	}
-
-	workerIdentity = identity_relay
-	return 0
 }

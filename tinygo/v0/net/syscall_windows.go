@@ -31,3 +31,5 @@ func syscallSetNonblock(fd uintptr, nonblocking bool) (err error) {
 		uintptr(unsafe.Pointer(&opt)))
 	return errno
 }
+
+type syscallFd = syscall.Handle

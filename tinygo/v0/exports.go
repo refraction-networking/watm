@@ -94,3 +94,142 @@ func _water_cancel_with(cancelFd int32) int32 {
 
 	return 0 // ESUCCESS
 }
+
+//export _water_dial
+func _water_dial(internalFd int32) (networkFd int32) {
+	if workerIdentity != identity_uninitialized {
+		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
+	}
+
+	// wrap the internalFd into a v0net.Conn
+	sourceConn = v0net.RebuildTCPConn(internalFd)
+	err := sourceConn.(*v0net.TCPConn).SetNonBlock(true)
+	if err != nil {
+		log.Printf("dial: sourceConn.SetNonblock: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	}
+
+	if d.wt != nil {
+		// call v0net.Dial
+		rawNetworkConn, err := v0net.Dial("", "")
+		if err != nil {
+			log.Printf("dial: v0net.Dial: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+		networkFd = rawNetworkConn.Fd()
+
+		// Note: here we are not setting nonblocking mode on the
+		// networkConn -- it depends on the WrappingTransport to
+		// determine whether to set nonblocking mode or not.
+
+		// wrap
+		remoteConn, err = d.wt.Wrap(rawNetworkConn)
+		if err != nil {
+			log.Printf("dial: d.wt.Wrap: %v", err)
+			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
+		}
+		// TODO: implement _water_dial with DialingTransport
+	} else {
+		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
+	}
+
+	workerIdentity = identity_dialer
+	return networkFd
+}
+
+//export _water_accept
+func _water_accept(internalFd int32) (networkFd int32) {
+	if workerIdentity != identity_uninitialized {
+		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
+	}
+
+	// wrap the internalFd into a v0net.Conn
+	sourceConn = v0net.RebuildTCPConn(internalFd)
+	err := sourceConn.(*v0net.TCPConn).SetNonBlock(true)
+	if err != nil {
+		log.Printf("dial: sourceConn.SetNonblock: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	}
+
+	if d.wt != nil {
+		var lis v0net.Listener = &v0net.TCPListener{}
+		// call v0net.Listener.Accept
+		rawNetworkConn, err := lis.Accept()
+		if err != nil {
+			log.Printf("dial: v0net.Listener.Accept: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+		networkFd = rawNetworkConn.Fd()
+
+		// Note: here we are not setting nonblocking mode on the
+		// networkConn -- it depends on the WrappingTransport to
+		// determine whether to set nonblocking mode or not.
+
+		// wrap
+		remoteConn, err = d.wt.Wrap(rawNetworkConn)
+		if err != nil {
+			log.Printf("dial: d.wt.Wrap: %v", err)
+			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
+		}
+		// TODO: implement _water_accept with ListeningTransport
+	} else {
+		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
+	}
+
+	workerIdentity = identity_listener
+	return networkFd
+}
+
+//export _water_associate
+func _water_associate() int32 {
+	if workerIdentity != identity_uninitialized {
+		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
+	}
+
+	if r.wt != nil {
+		var err error
+		var lis v0net.Listener = &v0net.TCPListener{}
+		sourceConn, err = lis.Accept()
+		if err != nil {
+			log.Printf("dial: v0net.Listener.Accept: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+
+		remoteConn, err = v0net.Dial("", "")
+		if err != nil {
+			log.Printf("dial: v0net.Dial: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+
+		if r.wrapSelection == RelayWrapRemote {
+			// wrap remoteConn
+			remoteConn, err = r.wt.Wrap(remoteConn.(*v0net.TCPConn))
+			// set sourceConn, the not-wrapped one, to non-blocking mode
+			sourceConn.(*v0net.TCPConn).SetNonBlock(true)
+		} else {
+			// wrap sourceConn
+			sourceConn, err = r.wt.Wrap(sourceConn.(*v0net.TCPConn))
+			// set remoteConn, the not-wrapped one, to non-blocking mode
+			remoteConn.(*v0net.TCPConn).SetNonBlock(true)
+		}
+		if err != nil {
+			log.Printf("dial: r.wt.Wrap: %v", err)
+			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
+		}
+	} else {
+		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
+	}
+
+	workerIdentity = identity_relay
+	return 0
+}
+
+//export _water_worker
+func _water_worker() int32 {
+	if workerIdentity == identity_uninitialized {
+		log.Println("worker: uninitialized")
+		return wasip1.EncodeWATERError(syscall.ENOTCONN) // socket not connected
+	}
+	log.Printf("worker: working as %s", identityStrings[workerIdentity])
+	return worker()
+}

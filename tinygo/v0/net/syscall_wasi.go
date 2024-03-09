@@ -44,3 +44,5 @@ const (
 	FDFLAG_RSYNC    = 0x0008
 	FDFLAG_SYNC     = 0x0010
 )
+
+type syscallFd = int
