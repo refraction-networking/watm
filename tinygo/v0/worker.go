@@ -51,16 +51,6 @@ func WorkerFairness(fair bool) {
 	}
 }
 
-//export _water_worker
-func _water_worker() int32 {
-	if workerIdentity == identity_uninitialized {
-		log.Println("worker: uninitialized")
-		return wasip1.EncodeWATERError(syscall.ENOTCONN) // socket not connected
-	}
-	log.Printf("worker: working as %s", identityStrings[workerIdentity])
-	return worker()
-}
-
 func worker() int32 {
 	defer _import_host_defer()
 

@@ -46,7 +46,7 @@ func (c *TCPConn) Read(b []byte) (n int, err error) {
 		// if no deadline set, behavior depends on blocking mode of the
 		// underlying file descriptor.
 		return syscallFnFd(c.rawConn, func(fd uintptr) (int, error) {
-			n, err := syscall.Read(int(fd), b)
+			n, err := syscall.Read(syscallFd(fd), b)
 			if n == 0 && err == nil {
 				err = io.EOF
 			}
@@ -60,7 +60,7 @@ func (c *TCPConn) Read(b []byte) (n int, err error) {
 		// we retry until the deadline is reached.
 		for {
 			if n, err = syscallFnFd(c.rawConn, func(fd uintptr) (int, error) {
-				n, err := syscall.Read(int(fd), b)
+				n, err := syscall.Read(syscallFd(fd), b)
 				if n == 0 && err == nil {
 					err = io.EOF
 				}
@@ -84,13 +84,13 @@ func (c *TCPConn) Write(b []byte) (n int, writeErr error) {
 		// if no deadline set, behavior depends on blocking mode of the
 		// underlying file descriptor.
 		return syscallFnFd(c.rawConn, func(fd uintptr) (int, error) {
-			return syscall.Write(int(fd), b)
+			return syscall.Write(syscallFd(fd), b)
 		})
 	} else {
 		// writeDeadline is set, if EAGAIN/EWOULDBLOCK is returned,
 		// we retry until the deadline is reached.
 		if err := c.rawConn.Write(func(fd uintptr) (done bool) {
-			n, writeErr = syscall.Write(int(fd), b)
+			n, writeErr = syscall.Write(syscallFd(fd), b)
 			if errors.Is(writeErr, syscall.EAGAIN) {
 				if time.Now().Before(wdl) {
 					return false
@@ -117,7 +117,7 @@ func (c *TCPConn) Close() error {
 	// 	})
 	// }
 	return syscallControlFd(c.rawConn, func(fd uintptr) error {
-		return syscall.Close(int(fd))
+		return syscall.Close(syscallFd(fd))
 	})
 }
 
