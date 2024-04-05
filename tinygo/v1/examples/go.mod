@@ -2,7 +2,7 @@ module github.com/refraction-networking/watm/tinygo/v1/examples
 
 go 1.21
 
-replace golang.org/x/sys v0.16.0 => ./replace/x/sys
+replace golang.org/x/sys => ../../replaced/golang.org/x/sys@v0.19.0
 
 replace github.com/refraction-networking/watm => ../../../
 
