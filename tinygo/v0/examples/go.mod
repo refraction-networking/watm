@@ -1,6 +1,6 @@
 module github.com/refraction-networking/watm/tinygo/v0/examples
 
-go 1.20
+go 1.21
 
 replace golang.org/x/sys v0.16.0 => ./replace/x/sys
 
@@ -13,11 +13,12 @@ require (
 )
 
 require (
-	github.com/andybalholm/brotli v1.0.6 // indirect
+	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
-	github.com/quic-go/quic-go v0.40.1 // indirect
-	golang.org/x/crypto v0.18.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	github.com/klauspost/compress v1.17.7 // indirect
+	github.com/quic-go/quic-go v0.42.0 // indirect
+	golang.org/x/crypto v0.22.0 // indirect
+	golang.org/x/exp v0.0.0-20221205204356-47842c84f3db // indirect
+	golang.org/x/sys v0.19.0 // indirect
 )
