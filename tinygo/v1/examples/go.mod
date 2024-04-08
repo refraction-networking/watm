@@ -1,4 +1,4 @@
-module github.com/refraction-networking/watm/tinygo/v0/examples
+module github.com/refraction-networking/watm/tinygo/v1/examples
 
 go 1.21
 

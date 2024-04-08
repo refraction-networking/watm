@@ -42,6 +42,38 @@ jobs:
         path: ${{ matrix.watm.name }}.v0.tinygo.wasm
         retention-days: 1
 
+  watm_tinygo_v1_artifacts:
+    name: "watm: build ${{ matrix.watm.name }}.v1.tinygo.wasm with TinyGo"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        watm: [ 
+          { name: "plain", scheduler: "none", gc: "conservative", tags: "purego" }, 
+          { name: "reverse", scheduler: "none", gc: "conservative", tags: "purego" }, 
+          { name: "utls", scheduler: "asyncify", gc: "conservative", tags: "purego" }
+        ]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: "1.22.x"
+    - uses: acifani/setup-tinygo@v2
+      with:
+        tinygo-version: '0.31.1'
+    - name: Build WATM Artifacts
+      run: tinygo build -o ../../../${{ matrix.watm.name }}.v1.tinygo.wasm 
+        -target=wasi -no-debug -scheduler=${{ matrix.watm.scheduler }} 
+        -gc=${{ matrix.watm.gc }} -tags=${{ matrix.watm.tags }} 
+        ./${{ matrix.watm.name }}/
+      working-directory: ./tinygo/v1/examples/
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.watm.name }}.v1.tinygo
+        path: ${{ matrix.watm.name }}.v1.tinygo.wasm
+        retention-days: 1
+
   release:
     needs: 
       - watm_tinygo_v0_artifacts
