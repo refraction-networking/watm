@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"errors"
 	"io"
 	"log"
 	"net"
@@ -84,8 +83,6 @@ func untilError(f func() error) error {
 // connection is not properly set to non-blocking mode, i.e., never returns
 // EAGAIN, this function will block forever and never work on a lower priority
 // connection. Thus it is called unfairWorker.
-//
-// TODO: use poll_oneoff instead of busy polling
 func unfairWorker() int32 {
 	conns := []v1net.Conn{ctrlConn, sourceConn, remoteConn}
 	evts := []uint16{v1net.EventFdRead, v1net.EventFdRead, v1net.EventFdRead}
@@ -103,8 +100,8 @@ func unfairWorker() int32 {
 
 		// 1st priority: ctrlConn
 		_, err = ctrlConn.Read(readBuf)
-		if !errors.Is(err, syscall.EAGAIN) {
-			if errors.Is(err, io.EOF) || err == nil {
+		if !(err == syscall.EAGAIN) {
+			if err == io.EOF || err == nil {
 				log.Println("worker: unfairWorker: ctrlConn is closed")
 				return wasip1.EncodeWATERError(syscall.ECANCELED) // operation canceled
 			}
@@ -205,8 +202,8 @@ func fairWorker() int32 {
 
 		// 1st priority: ctrlConn
 		_, err = ctrlConn.Read(readBuf)
-		if !errors.Is(err, syscall.EAGAIN) {
-			if errors.Is(err, io.EOF) || err == nil {
+		if !(err == syscall.EAGAIN) {
+			if err == io.EOF || err == nil {
 				log.Println("worker: fairWorker: ctrlConn is closed")
 				return wasip1.EncodeWATERError(syscall.ECANCELED) // operation canceled
 			}
@@ -254,8 +251,8 @@ func copyOnce(dstName, srcName string, dst, src net.Conn, buf []byte) error {
 	}
 
 	nRead, readErr := src.Read(buf)
-	if !errors.Is(readErr, syscall.EAGAIN) { // if EAGAIN, do nothing and return
-		if errors.Is(readErr, io.EOF) {
+	if !(readErr == syscall.EAGAIN) { // if EAGAIN, do nothing and return
+		if readErr == io.EOF {
 			log.Printf("worker: copyOnce: EOF on %s", srcName)
 			return io.EOF
 		} else if readErr != nil {
