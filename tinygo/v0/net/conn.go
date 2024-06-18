@@ -84,13 +84,13 @@ func (c *TCPConn) Write(b []byte) (n int, writeErr error) {
 		// if no deadline set, behavior depends on blocking mode of the
 		// underlying file descriptor.
 		return syscallFnFd(c.rawConn, func(fd uintptr) (int, error) {
-			return syscall.Write(syscallFd(fd), b)
+			return writeFD(fd, b)
 		})
 	} else {
 		// writeDeadline is set, if EAGAIN/EWOULDBLOCK is returned,
 		// we retry until the deadline is reached.
 		if err := c.rawConn.Write(func(fd uintptr) (done bool) {
-			n, writeErr = syscall.Write(syscallFd(fd), b)
+			n, writeErr = writeFD(fd, b)
 			if errors.Is(writeErr, syscall.EAGAIN) {
 				if time.Now().Before(wdl) {
 					return false
