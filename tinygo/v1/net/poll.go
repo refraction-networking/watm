@@ -37,8 +37,6 @@ import (
 // Since poll_oneoff is similar to poll(2), the implementation here was derived
 // from netpoll_aix.go.
 
-const _EINTR = 27
-
 const (
 	EventFdRead  uint16 = iota + 1 // readable event
 	EventFdWrite                   // writeable event
@@ -113,7 +111,7 @@ func _poll(fds []pollFd, maxTimeout int64) (nevents int32, err error) {
 retry:
 	errno := wasiimport.PollOneoff(unsafe.Pointer(&pollsubs[0]), unsafe.Pointer(&evts[0]), uint32(len(pollsubs)), unsafe.Pointer(&nevents))
 	if errno != 0 {
-		if errno != _EINTR {
+		if errno != uint32(syscall.EINTR) {
 			return 0, syscall.Errno(errno)
 		}
 
