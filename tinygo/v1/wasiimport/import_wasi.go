@@ -6,7 +6,7 @@ import "unsafe"
 
 // Import the Runtime-imported dial function,
 // which takes iovs for network and address and
-// returns a file descriptor for the dialled connection.
+// returns a file descriptor for the dialed connection.
 //
 //go:wasmimport env water_dial
 //go:noescape
