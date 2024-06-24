@@ -15,7 +15,7 @@ var (
 	_ tinyjson.Marshaler
 )
 
-func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(in *jlexer.Lexer, out *TLSConfig) {
+func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(in *jlexer.Lexer, out *TLSConfig) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -101,6 +101,31 @@ func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 			} else {
 				out.ECHConfigs = in.Bytes()
 			}
+		case "root_ca_path":
+			out.RootCAPath = string(in.String())
+		case "root_ca_dirs":
+			if in.IsNull() {
+				in.Skip()
+				out.RootCADirs = nil
+			} else {
+				in.Delim('[')
+				if out.RootCADirs == nil {
+					if !in.IsDelim(']') {
+						out.RootCADirs = make([]string, 0, 4)
+					} else {
+						out.RootCADirs = []string{}
+					}
+				} else {
+					out.RootCADirs = (out.RootCADirs)[:0]
+				}
+				for !in.IsDelim(']') {
+					var v5 string
+					v5 = string(in.String())
+					out.RootCADirs = append(out.RootCADirs, v5)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
 		default:
 			in.SkipRecursive()
 		}
@@ -111,7 +136,7 @@ func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 		in.Consumed()
 	}
 }
-func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(out *jwriter.Writer, in TLSConfig) {
+func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(out *jwriter.Writer, in TLSConfig) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -122,11 +147,11 @@ func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 			out.RawString("null")
 		} else {
 			out.RawByte('[')
-			for v5, v6 := range in.NextProtos {
-				if v5 > 0 {
+			for v6, v7 := range in.NextProtos {
+				if v6 > 0 {
 					out.RawByte(',')
 				}
-				out.String(string(v6))
+				out.String(string(v7))
 			}
 			out.RawByte(']')
 		}
@@ -138,16 +163,16 @@ func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 			out.RawString(`null`)
 		} else {
 			out.RawByte('{')
-			v7First := true
-			for v7Name, v7Value := range in.ApplicationSettings {
-				if v7First {
-					v7First = false
+			v8First := true
+			for v8Name, v8Value := range in.ApplicationSettings {
+				if v8First {
+					v8First = false
 				} else {
 					out.RawByte(',')
 				}
-				out.String(string(v7Name))
+				out.String(string(v8Name))
 				out.RawByte(':')
-				out.Base64Bytes(v7Value)
+				out.Base64Bytes(v8Value)
 			}
 			out.RawByte('}')
 		}
@@ -197,33 +222,54 @@ func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 		out.RawString(prefix)
 		out.Base64Bytes(in.ECHConfigs)
 	}
+	{
+		const prefix string = ",\"root_ca_path\":"
+		out.RawString(prefix)
+		out.String(string(in.RootCAPath))
+	}
+	{
+		const prefix string = ",\"root_ca_dirs\":"
+		out.RawString(prefix)
+		if in.RootCADirs == nil && (out.Flags&jwriter.NilSliceAsEmpty) == 0 {
+			out.RawString("null")
+		} else {
+			out.RawByte('[')
+			for v13, v14 := range in.RootCADirs {
+				if v13 > 0 {
+					out.RawByte(',')
+				}
+				out.String(string(v14))
+			}
+			out.RawByte(']')
+		}
+	}
 	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
 func (v TLSConfig) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(&w, v)
+	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalTinyJSON supports tinyjson.Marshaler interface
 func (v TLSConfig) MarshalTinyJSON(w *jwriter.Writer) {
-	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(w, v)
+	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *TLSConfig) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(&r, v)
+	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(&r, v)
 	return r.Error()
 }
 
 // UnmarshalTinyJSON supports tinyjson.Unmarshaler interface
 func (v *TLSConfig) UnmarshalTinyJSON(l *jlexer.Lexer) {
-	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib(l, v)
+	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib(l, v)
 }
-func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(in *jlexer.Lexer, out *Configurables) {
+func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(in *jlexer.Lexer, out *Configurables) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -254,6 +300,10 @@ func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 			}
 		case "client_hello_id":
 			out.ClientHelloID = string(in.String())
+		case "internal_buffer_size":
+			out.InternalBufferSize = int(in.Int())
+		case "background_worker_fairness":
+			out.BackgroundWorkerFairness = bool(in.Bool())
 		default:
 			in.SkipRecursive()
 		}
@@ -264,7 +314,7 @@ func tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 		in.Consumed()
 	}
 }
-func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(out *jwriter.Writer, in Configurables) {
+func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(out *jwriter.Writer, in Configurables) {
 	out.RawByte('{')
 	first := true
 	_ = first
@@ -282,29 +332,39 @@ func tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtls
 		out.RawString(prefix)
 		out.String(string(in.ClientHelloID))
 	}
+	{
+		const prefix string = ",\"internal_buffer_size\":"
+		out.RawString(prefix)
+		out.Int(int(in.InternalBufferSize))
+	}
+	{
+		const prefix string = ",\"background_worker_fairness\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.BackgroundWorkerFairness))
+	}
 	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
 func (v Configurables) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(&w, v)
+	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalTinyJSON supports tinyjson.Marshaler interface
 func (v Configurables) MarshalTinyJSON(w *jwriter.Writer) {
-	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(w, v)
+	tinyjsonAded76e7EncodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
 func (v *Configurables) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(&r, v)
+	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(&r, v)
 	return r.Error()
 }
 
 // UnmarshalTinyJSON supports tinyjson.Unmarshaler interface
 func (v *Configurables) UnmarshalTinyJSON(l *jlexer.Lexer) {
-	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV0ExamplesUtlsLib1(l, v)
+	tinyjsonAded76e7DecodeGithubComRefractionNetworkingWatmTinygoV1ExamplesUtlsLib1(l, v)
 }
