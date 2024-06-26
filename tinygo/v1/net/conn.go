@@ -80,29 +80,19 @@ func (c *TCPConn) Read(b []byte) (n int, err error) {
 
 // Write implements [net.Conn.Write].
 func (c *TCPConn) Write(b []byte) (n int, writeErr error) {
-	if wdl := c.writeDeadline; wdl.IsZero() {
-		// if no deadline set, behavior depends on blocking mode of the
-		// underlying file descriptor.
-		return syscallFnFd(c.rawConn, func(fd uintptr) (int, error) {
-			return writeFD(fd, b)
-		})
-	} else {
-		// writeDeadline is set, if EAGAIN/EWOULDBLOCK is returned,
-		// we retry until the deadline is reached.
-		if err := c.rawConn.Write(func(fd uintptr) (done bool) {
-			n, writeErr = writeFD(fd, b)
-			if errors.Is(writeErr, syscall.EAGAIN) {
-				if time.Now().Before(wdl) {
-					return false
-				}
-				writeErr = os.ErrDeadlineExceeded
+	if err := c.rawConn.Write(func(fd uintptr) (done bool) {
+		n, writeErr = writeFD(fd, b)
+		if errors.Is(writeErr, syscall.EAGAIN) {
+			if wdl := c.writeDeadline; wdl.IsZero() || time.Now().Before(wdl) {
+				return false
 			}
-			return true
-		}); err != nil {
-			return 0, err
+			writeErr = os.ErrDeadlineExceeded
 		}
-		return
+		return true
+	}); err != nil {
+		return n, err
 	}
+	return
 }
 
 // Close implements [net.Conn.Close].
