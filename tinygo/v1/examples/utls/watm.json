@@ -1,0 +1,9 @@
+{
+    "tls_config": {
+        "server_name": "example.com",
+        "root_ca_path": "/etc/ssl/certs/ca-certificates.crt"
+    },
+    "client_hello_id": "HelloChrome_Auto",
+    "internal_buffer_size": 1024,
+    "background_worker_fairness": true
+}

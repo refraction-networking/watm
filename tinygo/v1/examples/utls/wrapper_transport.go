@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/CosmWasm/tinyjson"
 	tls "github.com/refraction-networking/utls"
 	v1 "github.com/refraction-networking/watm/tinygo/v1"
@@ -18,6 +20,7 @@ type UTLSClientWrappingTransport struct {
 
 func (uwt *UTLSClientWrappingTransport) Wrap(conn v1net.Conn) (v1net.Conn, error) {
 	if uwt.tlsConfig == nil {
+		log.Println("UTLSClientWrappingTransport: tlsConfig is nil, using default config")
 		uwt.tlsConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
@@ -51,6 +54,13 @@ func (uwt *UTLSClientWrappingTransport) Configure(config []byte) error {
 
 	uwt.tlsConfig = configurables.GetTLSConfig()
 	uwt.clientHelloID = configurables.GetClientHelloID()
+
+	v1.WorkerFairness(configurables.BackgroundWorkerFairness)
+	log.Printf("UTLSClientWrappingTransport: set worker fairness to %v\n", configurables.BackgroundWorkerFairness)
+	if configurables.InternalBufferSize > 0 {
+		v1.SetReadBufferSize(configurables.InternalBufferSize)
+		log.Printf("UTLSClientWrappingTransport: set resizing internal buffer to %d Bytes\n", configurables.InternalBufferSize)
+	}
 
 	return nil
 }
