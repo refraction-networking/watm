@@ -11,59 +11,25 @@ import (
 	"github.com/refraction-networking/watm/wasip1"
 )
 
-// TODO: gaukas: I feel this function can be hugely optimized.
-// It is not necessary for us to check and configure
-// all the transports, but maybe only the one to be used.
-// Should we consider moving the configuration part to the
-// role-specific functions? (e.g. _dial, _accept, _associate)
-//
-//export watm_init_v1
-func _init() int32 {
-	// Check if dialer/listener/relay is configurable. If so,
-	// pull the config file from the host and configure them.
-	dct := globalDialer.ConfigurableTransport()
-	fdct := globalFixedDialer.ConfigurableTransport()
-	lct := globalListener.ConfigurableTransport()
-	rct := globalRelay.ConfigurableTransport()
-	if dct != nil || lct != nil /* || rct != nil */ {
-		config, err := readConfig()
-		if err == nil || config != nil {
-			if dct != nil {
-				dct.Configure(config)
-			}
-
-			if fdct != nil {
-				fdct.Configure(config)
-			}
-
-			if lct != nil {
-				lct.Configure(config)
-			}
-
-			if rct != nil {
-				rct.Configure(config)
-			}
-		} else if !errors.Is(err, syscall.EACCES) { // EACCES means no config file provided by the host
-			return wasip1.EncodeWATERError(err.(syscall.Errno))
-		}
-	}
-
-	// TODO: initialize the dialer, listener, and relay
-	globalDialer.Initialize()
-	globalFixedDialer.Initialize()
-	globalListener.Initialize()
-	globalRelay.Initialize()
-
-	return 0 // ESUCCESS
-}
-
-func readConfig() (config []byte, err error) {
-	// check if /conf/watm.cfg exists
-	file, err := os.Open("/conf/watm.cfg")
+func readInboundConfig() (config []byte, err error) {
+	// check if /conf/inbound.cfg exists
+	file, err := os.Open("/conf/inbound.cfg")
 	if err != nil {
 		return nil, syscall.EACCES
 	}
+	return readConfig(file)
+}
 
+func readOutboundConfig() (config []byte, err error) {
+	// check if /conf/outbound.cfg exists
+	file, err := os.Open("/conf/outbound.cfg")
+	if err != nil {
+		return nil, syscall.EACCES
+	}
+	return readConfig(file)
+}
+
+func readConfig(file *os.File) (config []byte, err error) {
 	// read the config file
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(file)
@@ -93,25 +59,65 @@ func _ctrlpipe(ctrlFd int32) int32 {
 	return 0 // ESUCCESS
 }
 
-//export watm_dial_v1
-func _dial(internalFd int32) (networkFd int32) {
+//export watm_userpipe_v1
+func _userpipe(userFd int32) int32 {
 	if workerIdentity != identity_uninitialized {
 		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
 	}
 
-	// wrap the internalFd into a v1net.Conn
-	sourceConn = v1net.RebuildTCPConn(internalFd)
-	err := sourceConn.(*v1net.TCPConn).SetNonBlock(true)
-	if err != nil {
-		log.Printf("dial: sourceConn.SetNonblock: %v", err)
+	sourceConn = v1net.RebuildTCPConn(userFd)
+	if err := sourceConn.SetNonBlock(true); err != nil {
+		log.Printf("internal_pipe: sourceConn.SetNonblock: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	}
+
+	return 0 // ESUCCESS
+}
+
+// _dial
+//
+//	watm_dial_v1(networkType s32) -> s32
+//
+//export watm_dial_v1
+func _dial(networkType int32) (networkFd int32) {
+	if workerIdentity != identity_uninitialized {
+		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
+	}
+
+	if !globalDialer.locked {
+		panic("dialer is not built with any outbound transport")
+	}
+
+	// Check if dialer is configurable. If so,
+	// pull the config file from the host and configure it.
+	configurableDialer := globalDialer.Configurable()
+	if configurableDialer != nil {
+		config, err := readOutboundConfig()
+		if err == nil || config != nil {
+			configurableDialer.Configure(config)
+		} else if !errors.Is(err, syscall.EACCES) { // EACCES means no config file provided by the host
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	}
+
+	if sourceConn == nil {
+		log.Printf("internal_pipe: sourceConn is nil, _internal_pipe must be called first")
+		return wasip1.EncodeWATERError(syscall.ENOTCONN) // socket not connected
+	}
+
+	var network string = v1net.ToNetworkTypeString(networkType)
+	var address string
+	var err error
+	if address, err = v1net.GetAddrSuggestion(); err != nil {
+		log.Printf("dial: v1net.GetAddrSuggestion: %v", err)
 		return wasip1.EncodeWATERError(err.(syscall.Errno))
 	}
 
 	if globalDialer.wt != nil {
 		// call v1net.Dial
-		rawNetworkConn, err := v1net.DialFixed()
+		rawNetworkConn, err := v1net.Dial(network, address)
 		if err != nil {
-			log.Printf("dial: v1net.Dial: %v", err)
+			log.Printf("dial: v1net.Dial(%s, %s): %v", network, address, err)
 			return wasip1.EncodeWATERError(err.(syscall.Errno))
 		}
 		networkFd = rawNetworkConn.Fd()
@@ -126,34 +132,11 @@ func _dial(internalFd int32) (networkFd int32) {
 			log.Printf("dial: d.wt.Wrap: %v", err)
 			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
 		}
-		// TODO: implementation using DialingTransport
-	} else {
-		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
-	}
-
-	workerIdentity = identity_dialer
-	return networkFd
-}
-
-//export watm_dial_fixed_v1
-func _dial_fixed(internalFd int32) (networkFd int32) {
-	if workerIdentity != identity_uninitialized {
-		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
-	}
-
-	// wrap the internalFd into a v1net.Conn
-	sourceConn = v1net.RebuildTCPConn(internalFd)
-	err := sourceConn.(*v1net.TCPConn).SetNonBlock(true)
-	if err != nil {
-		log.Printf("dial: sourceConn.SetNonblock: %v", err)
-		return wasip1.EncodeWATERError(err.(syscall.Errno))
-	}
-
-	if globalFixedDialer.fdt != nil {
-		globalFixedDialer.fdt.SetDialer(v1net.Dial)
-		remoteConn, err = globalFixedDialer.fdt.DialFixed()
+	} else if globalDialer.dt != nil {
+		// call dt.Dial
+		remoteConn, err = globalDialer.dt.Dial(network, address)
 		if err != nil {
-			log.Printf("dial: c.dt.Dial: %v", err)
+			log.Printf("dial: d.dt.Dial(%s, %s): %v", network, address, err)
 			return wasip1.EncodeWATERError(err.(syscall.Errno))
 		}
 		networkFd = remoteConn.Fd()
@@ -161,22 +144,40 @@ func _dial_fixed(internalFd int32) (networkFd int32) {
 		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
 	}
 
-	workerIdentity = identity_connector
+	remoteConn.SetNonBlock(true) // at this point, it is safe to set non-blocking mode on remoteConn
+	workerIdentity = identity_dialer
 	return networkFd
 }
 
+// _accept
+//
+//	watm_accept_v1() -> s32
+//
 //export watm_accept_v1
-func _accept(internalFd int32) (networkFd int32) {
+func _accept() (networkFd int32) {
 	if workerIdentity != identity_uninitialized {
 		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
 	}
 
-	// wrap the internalFd into a v1net.Conn
-	sourceConn = v1net.RebuildTCPConn(internalFd)
-	err := sourceConn.(*v1net.TCPConn).SetNonBlock(true)
-	if err != nil {
-		log.Printf("dial: sourceConn.SetNonblock: %v", err)
-		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	if !globalListener.locked {
+		panic("listener is not built with any inbound transport")
+	}
+
+	// Check if listener is configurable. If so,
+	// pull the config file from the host and configure it.
+	configurableListener := globalListener.Configurable()
+	if configurableListener != nil {
+		config, err := readInboundConfig()
+		if err == nil || config != nil {
+			configurableListener.Configure(config)
+		} else if !errors.Is(err, syscall.EACCES) { // EACCES means no config file provided by the host
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	}
+
+	if sourceConn == nil {
+		log.Printf("internal_pipe: sourceConn is nil, _internal_pipe must be called first")
+		return wasip1.EncodeWATERError(syscall.ENOTCONN) // socket not connected
 	}
 
 	if globalListener.wt != nil {
@@ -200,7 +201,6 @@ func _accept(internalFd int32) (networkFd int32) {
 			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
 		}
 	} else if globalListener.lt != nil {
-		globalListener.lt.SetListener(&v1net.TCPListener{})
 		// call v1net.ListeningTransport.Accept
 		wrappedNetworkConn, err := globalListener.lt.Accept()
 		if err != nil {
@@ -214,54 +214,118 @@ func _accept(internalFd int32) (networkFd int32) {
 		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
 	}
 
+	remoteConn.SetNonBlock(true) // at this point, it is safe to set non-blocking mode on remoteConn
 	workerIdentity = identity_listener
 	return networkFd
 }
 
+// _associate
+//
+//	watm_associate_v1(networkType s32) -> s32
+//
 //export watm_associate_v1
-func _associate() int32 {
+func _associate(networkType int32) int32 {
 	if workerIdentity != identity_uninitialized {
 		return wasip1.EncodeWATERError(syscall.EBUSY) // device or resource busy (worker already initialized)
 	}
 
-	if globalRelay.wt != nil {
-		var err error
-		var lis v1net.Listener = &v1net.TCPListener{}
-		sourceConn, err = lis.Accept()
+	if !globalRelay.inboundLocked && !globalRelay.outboundLocked {
+		panic("relay is not built with either inbound or outbound transport")
+	}
+
+	// Check if relay is configurable. If so,
+	// pull the config file from the host and configure it.
+	configurableInbRelay := globalRelay.InboundConfigurable()
+	if configurableInbRelay != nil {
+		config, err := readInboundConfig()
+		if err == nil || config != nil {
+			configurableInbRelay.Configure(config)
+		} else if !errors.Is(err, syscall.EACCES) { // EACCES means no config file provided by the host
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	}
+
+	configurableOutRelay := globalRelay.OutboundConfigurable()
+	if configurableOutRelay != nil {
+		config, err := readOutboundConfig()
+		if err == nil || config != nil {
+			configurableOutRelay.Configure(config)
+		} else if !errors.Is(err, syscall.EACCES) { // EACCES means no config file provided by the host
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	}
+
+	// handle inbound connection
+	var err error
+	if globalRelay.inboundListeningTransport != nil {
+		sourceConn, err = globalRelay.inboundListeningTransport.Accept()
 		if err != nil {
-			log.Printf("dial: v1net.Listener.Accept: %v", err)
+			log.Printf("dial: relay.ListeningTransport.Accept: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	} else { // we first accept the inbound connection, then wrap it if there's a wrapping transport set for it
+		sourceConn, err = (&v1net.TCPListener{}).Accept()
+		if err != nil {
+			log.Printf("dial: v1net.TCPListener.Accept: %v", err)
 			return wasip1.EncodeWATERError(err.(syscall.Errno))
 		}
 
-		remoteConn, err = v1net.DialFixed()
+		if globalRelay.inboundWrappingTransport != nil {
+			sourceConn, err = globalRelay.inboundWrappingTransport.Wrap(sourceConn.(*v1net.TCPConn))
+			if err != nil {
+				log.Printf("dial: r.inboundWrappingTransport.Wrap: %v", err)
+				return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
+			}
+		}
+	}
+
+	// handle outbound connection
+	var network string = v1net.ToNetworkTypeString(networkType)
+	var address string
+	if address, err = v1net.GetAddrSuggestion(); err != nil {
+		log.Printf("dial: v1net.GetAddrSuggestion: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	}
+	if globalRelay.outboundDialingTransport != nil {
+		remoteConn, err = globalRelay.outboundDialingTransport.Dial(network, address)
+		if err != nil {
+			log.Printf("dial: r.outboundDialingTransport.Dial: %v", err)
+			return wasip1.EncodeWATERError(err.(syscall.Errno))
+		}
+	} else { // we first dial the outbound connection, then wrap it if there's a wrapping transport set for it
+		remoteConn, err = v1net.Dial(network, address)
 		if err != nil {
 			log.Printf("dial: v1net.Dial: %v", err)
 			return wasip1.EncodeWATERError(err.(syscall.Errno))
 		}
 
-		if globalRelay.wrapSelection == RelayWrapRemote {
-			// wrap remoteConn
-			remoteConn, err = globalRelay.wt.Wrap(remoteConn.(*v1net.TCPConn))
-			// set sourceConn, the not-wrapped one, to non-blocking mode
-			sourceConn.(*v1net.TCPConn).SetNonBlock(true)
-		} else {
-			// wrap sourceConn
-			sourceConn, err = globalRelay.wt.Wrap(sourceConn.(*v1net.TCPConn))
-			// set remoteConn, the not-wrapped one, to non-blocking mode
-			remoteConn.(*v1net.TCPConn).SetNonBlock(true)
+		if globalRelay.outboundWrappingTransport != nil {
+			remoteConn, err = globalRelay.outboundWrappingTransport.Wrap(remoteConn.(*v1net.TCPConn))
+			if err != nil {
+				log.Printf("dial: r.outboundWrappingTransport.Wrap: %v", err)
+				return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
+			}
 		}
-		if err != nil {
-			log.Printf("dial: r.wt.Wrap: %v", err)
-			return wasip1.EncodeWATERError(syscall.EPROTO) // protocol error
-		}
-	} else {
-		return wasip1.EncodeWATERError(syscall.EPERM) // operation not permitted
+	}
+
+	// set non-blocking mode on both connections
+	if err := sourceConn.SetNonBlock(true); err != nil {
+		log.Printf("dial: sourceConn.SetNonblock: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
+	}
+	if err := remoteConn.SetNonBlock(true); err != nil {
+		log.Printf("dial: remoteConn.SetNonblock: %v", err)
+		return wasip1.EncodeWATERError(err.(syscall.Errno))
 	}
 
 	workerIdentity = identity_relay
 	return 0
 }
 
+// _start
+//
+//	watm_start_v1() -> s32
+//
 //export watm_start_v1
 func _start() int32 {
 	if workerIdentity == identity_uninitialized {

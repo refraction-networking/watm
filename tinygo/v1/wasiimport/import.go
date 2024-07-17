@@ -14,16 +14,9 @@ func SetWaterDialedFD(fd int32) {
 }
 
 func water_dial(
-	_ unsafe.Pointer, _ size,
-	_ unsafe.Pointer, _ size,
+	int32,
+	unsafe.Pointer, size,
 ) (fd int32) {
-	return waterDialedFD
-}
-
-// This function should be imported from the host in WASI.
-// On non-WASI platforms, it mimicks the behavior of the host
-// by returning a file descriptor of preset value.
-func water_dial_fixed() (fd int32) {
 	return waterDialedFD
 }
 
@@ -38,6 +31,12 @@ func SetWaterAcceptedFD(fd int32) {
 // by returning a file descriptor of preset value.
 func water_accept() (fd int32) {
 	return waterAcceptedFD
+}
+
+func water_get_addr_suggestion(
+	unsafe.Pointer, size,
+) (n int32) {
+	return 0
 }
 
 // emulate the behavior when no file descriptors are

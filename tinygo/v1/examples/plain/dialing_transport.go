@@ -1,17 +1,23 @@
 package main
 
-import v1net "github.com/refraction-networking/watm/tinygo/v1/net"
+import (
+	v1 "github.com/refraction-networking/watm/tinygo/v1"
+	v1net "github.com/refraction-networking/watm/tinygo/v1/net"
+)
 
-type PlainFixedDialingTransport struct {
+// type guard
+var _ v1.DialingTransport = (*PlainDialingTransport)(nil)
+
+type PlainDialingTransport struct {
 	dialer func(network, address string) (v1net.Conn, error)
 }
 
-func (fdt *PlainFixedDialingTransport) SetDialer(dialer func(network, address string) (v1net.Conn, error)) {
-	fdt.dialer = dialer
+func (dt *PlainDialingTransport) SetDialer(dialer func(network, address string) (v1net.Conn, error)) {
+	dt.dialer = dialer
 }
 
-func (fdt *PlainFixedDialingTransport) DialFixed() (v1net.Conn, error) {
-	conn, err := fdt.dialer("tcp", "localhost:7700") // TODO: hardcoded address, any better idea?
+func (dt *PlainDialingTransport) Dial(network, address string) (v1net.Conn, error) {
+	conn, err := dt.dialer(network, address) // dial the passed address
 	if err != nil {
 		return nil, err
 	}

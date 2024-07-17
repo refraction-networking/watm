@@ -1,78 +1,121 @@
 package v1
 
-type RelayWrapSelection bool
-
-const (
-	RelayWrapRemote RelayWrapSelection = false
-	RelayWrapSource RelayWrapSelection = true
-)
+import v1net "github.com/refraction-networking/watm/tinygo/v1/net"
 
 type relay struct {
-	wt            WrappingTransport
-	wrapSelection RelayWrapSelection
-	// lt ListeningTransport
-	// dt DialingTransport
+	// inbound: pick one
+	inboundWrappingTransport  WrappingTransport
+	inboundListeningTransport ListeningTransport
+	inboundLocked             bool
+
+	// outbound: pick one
+	outboundWrappingTransport WrappingTransport
+	outboundDialingTransport  DialingTransport
+	outboundLocked            bool
 }
 
-func (r *relay) ConfigurableTransport() ConfigurableTransport {
-	if r.wt != nil {
-		if wt, ok := r.wt.(ConfigurableTransport); ok {
+// InboundConfigurable returns non-nil if the relay is built with a
+// configurable inbound transport.
+func (r *relay) InboundConfigurable() Configurable {
+	if r.inboundWrappingTransport != nil {
+		if wt, ok := r.inboundWrappingTransport.(Configurable); ok {
 			return wt
 		}
+	} else if r.inboundListeningTransport != nil {
+		if lt, ok := r.inboundListeningTransport.(Configurable); ok {
+			return lt
+		}
 	}
-
-	// if r.lt != nil {
-	// 	if lt, ok := r.lt.(ConfigurableTransport); ok {
-	// 		return lt
-	// 	}
-	// }
-
-	// if r.dt != nil {
-	// 	if dt, ok := r.dt.(ConfigurableTransport); ok {
-	// 		return dt
-	// 	}
-	// }
 
 	return nil
 }
 
-func (r *relay) Initialize() {
-	// TODO: allow initialization on relay
+// OutboundConfigurable returns non-nil if the relay is built with a
+// configurable outbound transport.
+func (r *relay) OutboundConfigurable() Configurable {
+	if r.outboundWrappingTransport != nil {
+		if wt, ok := r.outboundWrappingTransport.(Configurable); ok {
+			return wt
+		}
+	} else if r.outboundDialingTransport != nil {
+		if dt, ok := r.outboundDialingTransport.(Configurable); ok {
+			return dt
+		}
+	}
+
+	return nil
 }
 
 var globalRelay relay
 
-// BuildRelayWithWrappingTransport arms the relay with a
-// [WrappingTransport] that is used to wrap a [v1net.Conn] into
-// another [net.Conn] by providing some high-level application
-// layer protocol.
+// BuildRelayWithInboundTransport arms the relay with an inbound
+// transport that is used to accept inbound connections on a local
+// address and provide high-level application layer protocol over the
+// accepted connection.
 //
-// The caller MUST keep in mind that the [WrappingTransport] is
-// used to wrap the connection to the remote address, not the
-// connection from the source address (the dialing peer).
-// To reverse this behavior, i.e., wrap the inbounding connection,
-// set wrapSelection to [RelayWrapSource].
-//
-// Mutually exclusive with [BuildRelayWithListeningDialingTransport].
-func BuildRelayWithWrappingTransport(wt WrappingTransport, wrapSelection RelayWrapSelection) {
-	globalRelay.wt = wt
-	globalRelay.wrapSelection = wrapSelection
-	// r.lt = nil
-	// r.dt = nil
+// Outbound transport must be set as well before or after calling
+// this function to complete the relay configuration. Otherwise,
+// the outbound transport will be plain.
+func BuildRelayWithInboundTransport(anyTransport interface{}) {
+	switch t := anyTransport.(type) {
+	case WrappingTransport:
+		BuildRelayWithInboundWrappingTransport(t)
+	case ListeningTransport:
+		BuildRelayWithInboundListeningTransport(t)
+	default:
+		panic("transport type not supported")
+	}
 }
 
-// BuildRelayWithListeningDialingTransport arms the relay with a
-// [ListeningTransport] that is used to accept incoming connections
-// on a local address and provide high-level application layer
-// protocol over the accepted connection, and a [DialingTransport]
-// that is used to dial a remote address and provide high-level
-// application layer protocol over the dialed connection.
-//
-// Mutually exclusive with [BuildRelayWithWrappingTransport].
-func BuildRelayWithListeningDialingTransport(lt ListeningTransport, dt DialingTransport) {
-	// TODO: implement BuildRelayWithListeningDialingTransport
-	// r.lt = lt
-	// r.dt = dt
-	// r.wt = nil
-	panic("BuildRelayWithListeningDialingTransport: not implemented")
+func BuildRelayWithOutboundTransport(anyTransport interface{}) {
+	switch t := anyTransport.(type) {
+	case WrappingTransport:
+		BuildRelayWithOutboundWrappingTransport(t)
+	case DialingTransport:
+		BuildRelayWithOutboundDialingTransport(t)
+	default:
+		panic("transport type not supported")
+	}
+}
+
+func BuildRelayWithInboundWrappingTransport(wt WrappingTransport) {
+	if globalRelay.inboundLocked {
+		panic("relay is locked")
+	}
+
+	globalRelay.inboundWrappingTransport = wt
+	globalRelay.inboundListeningTransport = nil
+	globalRelay.inboundLocked = true
+}
+
+func BuildRelayWithInboundListeningTransport(lt ListeningTransport) {
+	if globalRelay.inboundLocked {
+		panic("relay is locked")
+	}
+
+	globalRelay.inboundListeningTransport = lt
+	lt.SetListener(&v1net.TCPListener{})
+	globalRelay.inboundWrappingTransport = nil
+	globalRelay.inboundLocked = true
+}
+
+func BuildRelayWithOutboundWrappingTransport(wt WrappingTransport) {
+	if globalRelay.outboundLocked {
+		panic("relay is locked")
+	}
+
+	globalRelay.outboundWrappingTransport = wt
+	globalRelay.outboundDialingTransport = nil
+	globalRelay.outboundLocked = true
+}
+
+func BuildRelayWithOutboundDialingTransport(dt DialingTransport) {
+	if globalRelay.outboundLocked {
+		panic("relay is locked")
+	}
+
+	globalRelay.outboundDialingTransport = dt
+	dt.SetDialer(v1net.Dial)
+	globalRelay.outboundWrappingTransport = nil
+	globalRelay.outboundLocked = true
 }
