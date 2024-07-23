@@ -314,6 +314,11 @@ func _start() uint32 {
 	return worker()
 }
 
+//export watm_lasterror_v1
+func _lasterror() uint32 {
+	return uint32(lastError)
+}
+
 func saveAndReturnError(err error) uint32 {
 	syscallErrno, ok := err.(syscall.Errno)
 	if !ok {
