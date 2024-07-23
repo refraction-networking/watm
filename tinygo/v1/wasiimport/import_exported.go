@@ -3,20 +3,25 @@ package wasiimport
 import "unsafe"
 
 func WaterDial(
-	networkType int32,
+	networkType uint32,
 	addressCiovs unsafe.Pointer, addressCiovsLen size,
-) (fd int32) {
-	return water_dial(networkType, addressCiovs, addressCiovsLen)
+	fd unsafe.Pointer,
+) errno {
+	return water_dial(
+		networkType,
+		addressCiovs, addressCiovsLen,
+		fd)
 }
 
-func WaterAccept() (fd int32) {
-	return water_accept()
+func WaterAccept(fd unsafe.Pointer) errno {
+	return water_accept(fd)
 }
 
 func WaterGetAddrSuggestion(
 	addressIovs unsafe.Pointer, addressIovsLen size,
-) (n int32) {
-	return water_get_addr_suggestion(addressIovs, addressIovsLen)
+	nread unsafe.Pointer,
+) errno {
+	return water_get_addr_suggestion(addressIovs, addressIovsLen, nread)
 }
 
 func FdFdstatSetFlags(fd int32, flags uint32) uint32 {

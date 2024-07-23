@@ -2,6 +2,7 @@ package net
 
 import (
 	"syscall"
+	"unsafe"
 
 	"github.com/refraction-networking/watm/tinygo/v1/wasiimport"
 	"github.com/refraction-networking/watm/wasip1"
@@ -30,7 +31,10 @@ func (tl *TCPListener) Accept() (Conn, error) {
 		return nil, syscall.EINVAL
 	}
 
-	fd, err := wasip1.DecodeWATERError(wasiimport.WaterAccept())
+	var fd int32
+	err := wasip1.ErrnoToError(wasiimport.WaterAccept(
+		unsafe.Pointer(&fd),
+	))
 	if err != nil {
 		return nil, err
 	}

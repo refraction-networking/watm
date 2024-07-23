@@ -5,17 +5,17 @@ import (
 	"syscall"
 )
 
-// errno is just a copy of syscall.Errno from the Go standard library.
-//
-// The values are defined in syscall/tables_wasip1.go.
-type errno syscall.Errno
-
 // DecodeWATERError converts a error code returned by WATER API
 // into a syscall.Errno or a higher-level error in Go.
 //
 // It automatically detects whether the error code is a WATER error
 // or a success code (positive). In case of a success code, it
 // returns the code itself and a nil error.
+//
+// Deprecated: starting from WATM v1 API, returned errno is always
+// a ground truth syscall.Errno and not multiplexed with other positive
+// return values. Positive return values are always set via a pointer
+// as a parameter to the function.
 func DecodeWATERError(errorCode int32) (n int32, err error) {
 	if errorCode >= 0 {
 		n = errorCode // such that when error code is 0, it will return 0, nil
@@ -34,6 +34,11 @@ func DecodeWATERError(errorCode int32) (n int32, err error) {
 	return
 }
 
+// EncodeWATERError converts a syscall.Errno (positive) into a error code
+// returned by WATER API (negative).
+//
+// Deprecated: starting from WATM v1 API, returned errno is always a ground
+// truth syscall.Errno and not multiplexed with other positive return values.
 func EncodeWATERError(errno syscall.Errno) int32 {
 	if errno == 0 {
 		return 0

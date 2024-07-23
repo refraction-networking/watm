@@ -1,13 +1,13 @@
 package net
 
 const (
-	NETWORK_UNKNOWN int32 = iota
+	NETWORK_UNKNOWN uint32 = iota
 	NETWORK_TCP
 	NETWORK_TCP4
 	NETWORK_TCP6
 )
 
-func ToNetworkTypeString(networkType int32) string {
+func ToNetworkTypeString(networkType uint32) string {
 	switch networkType {
 	case NETWORK_TCP:
 		return "tcp"
@@ -20,7 +20,7 @@ func ToNetworkTypeString(networkType int32) string {
 	}
 }
 
-func ToNetworkTypeInt(networkType string) int32 {
+func ToNetworkTypeInt(networkType string) uint32 {
 	switch networkType {
 	case "tcp":
 		return NETWORK_TCP
