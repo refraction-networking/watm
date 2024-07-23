@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	v1net "github.com/refraction-networking/watm/tinygo/v1/net"
-	"github.com/refraction-networking/watm/wasip1"
 )
 
 type identity uint8
@@ -34,7 +33,7 @@ var sourceConn v1net.Conn // sourceConn is used to communicate between WASM and 
 var remoteConn v1net.Conn // remoteConn is used to communicate between WASM and a dialed remote destination (for dialer/relay) or a dialing party (for listener only)
 var ctrlConn v1net.Conn   // ctrlConn is used to control the entire worker with control messages
 
-var workerFn func() int32 = unfairWorker // by default, use unfairWorker for better performance under mostly unidirectional I/O
+var workerFn func() uint32 = unfairWorker // by default, use unfairWorker for better performance under mostly unidirectional I/O
 
 var readBuf []byte = make([]byte, 1024) // 1024B buffer for reading, size can be updated with [SetReadBufferSize]
 
@@ -57,10 +56,10 @@ func WorkerFairness(fair bool) {
 	}
 }
 
-func worker() int32 {
+func worker() uint32 {
 	if sourceConn == nil || remoteConn == nil || ctrlConn == nil {
-		log.Println("worker: worker: sourceConn, remoteConn, or ctrlConn is nil")
-		return wasip1.EncodeWATERError(syscall.EBADF) // bad file descriptor
+		log.Println("worker: at least one of sourceConn, remoteConn, and ctrlConn is nil")
+		return saveAndReturnError(syscall.EBADF) // bad file descriptor
 	}
 
 	return workerFn()
@@ -83,7 +82,7 @@ func untilError(f func() error) error {
 // connection is not properly set to non-blocking mode, i.e., never returns
 // EAGAIN, this function will block forever and never work on a lower priority
 // connection. Thus it is called unfairWorker.
-func unfairWorker() int32 {
+func unfairWorker() uint32 {
 	conns := []v1net.Conn{ctrlConn, sourceConn, remoteConn}
 	evts := []uint16{v1net.EventFdRead, v1net.EventFdRead, v1net.EventFdRead}
 
@@ -95,7 +94,7 @@ func unfairWorker() int32 {
 				continue
 			}
 			log.Println("worker: unfairWorker: _poll:", err)
-			return int32(err.(syscall.Errno))
+			return saveAndReturnError(err)
 		}
 
 		// 1st priority: ctrlConn
@@ -103,10 +102,10 @@ func unfairWorker() int32 {
 		if !(err == syscall.EAGAIN) {
 			if err == io.EOF || err == nil {
 				log.Println("worker: unfairWorker: ctrlConn is closed")
-				return wasip1.EncodeWATERError(syscall.ECANCELED) // operation canceled
+				return saveAndReturnError(syscall.ECANCELED) // operation canceled
 			}
 			log.Println("worker: unfairWorker: ctrlConn.Read:", err)
-			return wasip1.EncodeWATERError(syscall.EIO) // input/output error
+			return saveAndReturnError(syscall.EIO) // input/output error
 		}
 
 		// 2nd priority: sourceConn
@@ -134,12 +133,12 @@ func unfairWorker() int32 {
 		}); err != syscall.EAGAIN { // silently ignore EAGAIN
 			if err == io.EOF {
 				log.Println("worker: unfairWorker: sourceConn is closed")
-				return wasip1.EncodeWATERError(0) // success, no error
+				return saveAndReturnError(syscall.Errno(0)) // success, no error
 			}
 			if errno, ok := err.(syscall.Errno); ok {
-				return wasip1.EncodeWATERError(errno)
+				return saveAndReturnError(errno)
 			}
-			return wasip1.EncodeWATERError(syscall.EIO) // input/output error
+			return saveAndReturnError(syscall.EIO) // input/output error
 		}
 
 		// 3rd priority: remoteConn
@@ -167,12 +166,12 @@ func unfairWorker() int32 {
 		}); err != syscall.EAGAIN { // silently ignore EAGAIN
 			if err == io.EOF {
 				log.Println("worker: unfairWorker: remoteConn is closed")
-				return wasip1.EncodeWATERError(0) // success, no error
+				return saveAndReturnError(syscall.Errno(0)) // success, no error
 			}
 			if errno, ok := err.(syscall.Errno); ok {
-				return wasip1.EncodeWATERError(errno)
+				return saveAndReturnError(errno)
 			}
-			return wasip1.EncodeWATERError(syscall.EIO) // input/output error
+			return saveAndReturnError(syscall.EIO) // input/output error
 		}
 	}
 }
@@ -185,7 +184,7 @@ func unfairWorker() int32 {
 // make progress if one of the connection is not properly set to non-blocking mode.
 //
 // TODO: use poll_oneoff instead of busy polling
-func fairWorker() int32 {
+func fairWorker() uint32 {
 	conns := []v1net.Conn{ctrlConn, sourceConn, remoteConn}
 	evts := []uint16{v1net.EventFdRead, v1net.EventFdRead, v1net.EventFdRead}
 
@@ -197,7 +196,7 @@ func fairWorker() int32 {
 				continue
 			}
 			log.Println("worker: unfairWorker: _poll:", err)
-			return int32(err.(syscall.Errno))
+			return saveAndReturnError(err)
 		}
 
 		// 1st priority: ctrlConn
@@ -205,10 +204,10 @@ func fairWorker() int32 {
 		if !(err == syscall.EAGAIN) {
 			if err == io.EOF || err == nil {
 				log.Println("worker: fairWorker: ctrlConn is closed")
-				return wasip1.EncodeWATERError(syscall.ECANCELED) // operation canceled
+				return saveAndReturnError(syscall.ECANCELED) // operation canceled
 			}
 			log.Println("worker: fairWorker: ctrlConn.Read:", err)
-			return wasip1.EncodeWATERError(syscall.EIO) // input/output error
+			return saveAndReturnError(syscall.EIO) // input/output error
 		}
 
 		// 2nd priority: sourceConn -> remoteConn
@@ -219,12 +218,12 @@ func fairWorker() int32 {
 			sourceConn,   // src
 			readBuf); err != nil {
 			if err == io.EOF {
-				return wasip1.EncodeWATERError(0) // success, no error
+				return saveAndReturnError(syscall.Errno(0)) // success, no error
 			}
 			if errno, ok := err.(syscall.Errno); ok {
-				return wasip1.EncodeWATERError(errno)
+				return saveAndReturnError(errno)
 			}
-			return wasip1.EncodeWATERError(syscall.EIO) // other input/output error
+			return saveAndReturnError(syscall.EIO) // other input/output error
 		}
 
 		// 3rd priority: remoteConn -> sourceConn
@@ -235,12 +234,12 @@ func fairWorker() int32 {
 			remoteConn,   // src
 			readBuf); err != nil {
 			if err == io.EOF {
-				return wasip1.EncodeWATERError(0)
+				return saveAndReturnError(syscall.Errno(0)) // success, no error
 			}
 			if errno, ok := err.(syscall.Errno); ok {
-				return wasip1.EncodeWATERError(errno)
+				return saveAndReturnError(errno)
 			}
-			return wasip1.EncodeWATERError(syscall.EIO) // other input/output error
+			return saveAndReturnError(syscall.EIO) // other input/output error
 		}
 	}
 }

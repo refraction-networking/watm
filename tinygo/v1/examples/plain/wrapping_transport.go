@@ -11,7 +11,7 @@ var _ v1.WrappingTransport = (*PlainWrappingTransport)(nil)
 type PlainWrappingTransport struct {
 }
 
-func (rwt *PlainWrappingTransport) Wrap(conn v1net.Conn) (v1net.Conn, error) {
+func (*PlainWrappingTransport) Wrap(conn v1net.Conn) (v1net.Conn, error) {
 	return &PlainConn{conn}, conn.SetNonBlock(true) // must set non-block, otherwise will block on read and lose fairness
 }
 

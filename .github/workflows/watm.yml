@@ -37,29 +37,6 @@ jobs:
           go build -v ./...
           go test -v ./...
 
-  watm_build_tinygo_v0_examples:
-    name: "build ${{ matrix.examples }}.v0.tinygo.wasm w/ tinygo ${{ matrix.tinygo }} (go${{ matrix.go }})"
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix:
-        tinygo: [ "0.32.0" ] # latest tinygo version ONLY (1)
-        go: [ "1.21.x", "1.22.x" ] # latest 2 stable versions of Go. TODO: bump to 1.22.x once tinygo support added.
-        examples: [ "plain", "reverse", "utls" ] # Add examples here per ones under tinygo/v0/examples
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-go@v5
-      with:
-        go-version: ${{ matrix.go }}
-    - uses: acifani/setup-tinygo@v2
-      with:
-        tinygo-version: ${{ matrix.tinygo }}
-    - name: Build
-      run: |
-        mkdir -p tmp
-        tinygo build -o tmp/${{ matrix.examples }}.wasm -target=wasi -tags=purego ./${{ matrix.examples }}/
-      working-directory: ./tinygo/v0/examples/
-
   watm_build_tinygo_v1_examples:
     name: "build ${{ matrix.examples }}.v1.tinygo.wasm w/ tinygo ${{ matrix.tinygo }} (go${{ matrix.go }})"
     runs-on: ubuntu-latest

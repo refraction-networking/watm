@@ -1,22 +1,11 @@
 package main
 
 import (
-	v0 "github.com/refraction-networking/watm/tinygo/v0"
-	v0net "github.com/refraction-networking/watm/tinygo/v0/net"
+	v1net "github.com/refraction-networking/watm/tinygo/v1/net"
 )
 
-// type guard: ReverseWrappingTransport must implement [v0.WrappingTransport].
-var _ v0.WrappingTransport = (*ReverseWrappingTransport)(nil)
-
-type ReverseWrappingTransport struct {
-}
-
-func (rwt *ReverseWrappingTransport) Wrap(conn v0net.Conn) (v0net.Conn, error) {
-	return &ReverseConn{conn}, conn.SetNonBlock(true) // must set non-block, otherwise will block on read and lose fairness
-}
-
 type ReverseConn struct {
-	v0net.Conn // embedded Conn
+	v1net.Conn // embedded Conn
 }
 
 func (rc *ReverseConn) Read(b []byte) (n int, err error) {

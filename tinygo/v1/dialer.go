@@ -1,19 +1,22 @@
 package v1
 
+import v1net "github.com/refraction-networking/watm/tinygo/v1/net"
+
 type dialer struct {
+	// outbound: pick one
 	wt WrappingTransport
 	dt DialingTransport
+
+	locked bool
 }
 
-func (d *dialer) ConfigurableTransport() ConfigurableTransport {
+func (d *dialer) Configurable() Configurable {
 	if d.wt != nil {
-		if wt, ok := d.wt.(ConfigurableTransport); ok {
+		if wt, ok := d.wt.(Configurable); ok {
 			return wt
 		}
-	}
-
-	if d.dt != nil {
-		if dt, ok := d.dt.(ConfigurableTransport); ok {
+	} else if d.dt != nil {
+		if dt, ok := d.dt.(Configurable); ok {
 			return dt
 		}
 	}
@@ -21,21 +24,43 @@ func (d *dialer) ConfigurableTransport() ConfigurableTransport {
 	return nil
 }
 
-func (d *dialer) Initialize() {
-	// TODO: allow initialization on dialer
-}
-
 var globalDialer dialer
+
+// BuildDialerWithOutboundTransport arms the dialer with a
+// [WrappingTransport] or [DialingTransport] that is used to wrap
+// a [v1net.Conn] into another [net.Conn] by providing some
+// high-level application layer protocol or dial a remote address
+// and provide high-level application layer protocol over the dialed
+// connection.
+func BuildDialerWithOutboundTransport(anyTransport any) {
+	switch t := anyTransport.(type) {
+	case WrappingTransport:
+		BuildDialerWithWrappingTransport(t)
+	case DialingTransport:
+		BuildDialerWithDialingTransport(t)
+	default:
+		panic("transport type not supported")
+	}
+}
 
 // BuildDialerWithWrappingTransport arms the dialer with a
 // [WrappingTransport] that is used to wrap a [v1net.Conn] into
 // another [net.Conn] by providing some high-level application
 // layer protocol.
 //
+// The caller MUST keep in mind that the [WrappingTransport] is
+// used to wrap the outbound connection (to the remote address), not the
+// connection from the caller (the client).
+//
 // Mutually exclusive with [BuildDialerWithDialingTransport].
 func BuildDialerWithWrappingTransport(wt WrappingTransport) {
+	if globalDialer.locked {
+		panic("dialer is locked")
+	}
+
 	globalDialer.wt = wt
 	globalDialer.dt = nil
+	globalDialer.locked = true
 }
 
 // BuildDialerWithDialingTransport arms the dialer with a
@@ -45,36 +70,12 @@ func BuildDialerWithWrappingTransport(wt WrappingTransport) {
 //
 // Mutually exclusive with [BuildDialerWithWrappingTransport].
 func BuildDialerWithDialingTransport(dt DialingTransport) {
-	panic("not implemented until Runtime start passing remote access into WATM")
-	// globalDialer.dt = dt
-	// globalDialer.wt = nil
-}
-
-type fixedDialer struct {
-	fdt FixedDialingTransport
-}
-
-// ConfigurableTransport returns the ConfigurableTransport of the
-// underlying DialingTransport if it implements the interface.
-func (f *fixedDialer) ConfigurableTransport() ConfigurableTransport {
-	if f.fdt != nil {
-		if dt, ok := f.fdt.(ConfigurableTransport); ok {
-			return dt
-		}
+	if globalDialer.locked {
+		panic("dialer is locked")
 	}
 
-	return nil
-}
-
-func (f *fixedDialer) Initialize() {
-	// TODO: allow initialization on dialer
-}
-
-var globalFixedDialer fixedDialer
-
-// BuildFixedDialerWithFixedDialingTransport arms the fixedDialer with a
-// [FixedDialingTransport] that provide high-level application layer protocol
-// over the dialed connection.
-func BuildFixedDialerWithFixedDialingTransport(fdt FixedDialingTransport) {
-	globalFixedDialer.fdt = fdt
+	globalDialer.dt = dt
+	dt.SetDialer(v1net.Dial)
+	globalDialer.wt = nil
+	globalDialer.locked = true
 }

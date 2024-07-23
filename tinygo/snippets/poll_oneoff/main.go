@@ -18,8 +18,7 @@ var pollWasm []byte
 
 func main() {
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, experimental.FunctionListenerFactoryKey{},
-		logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeFilesystem|logging.LogScopePoll|logging.LogScopeSock))
+	ctx = experimental.WithFunctionListenerFactory(ctx, logging.NewHostLoggingListenerFactory(os.Stderr, logging.LogScopeFilesystem|logging.LogScopePoll|logging.LogScopeSock))
 
 	r := wazero.NewRuntime(ctx)
 	defer r.Close(ctx)

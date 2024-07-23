@@ -44,7 +44,7 @@ func (uwt *UTLSClientWrappingTransport) Wrap(conn v1net.Conn) (v1net.Conn, error
 	}, nil
 }
 
-var _ v1.ConfigurableTransport = (*UTLSClientWrappingTransport)(nil)
+var _ v1.Configurable = (*UTLSClientWrappingTransport)(nil)
 
 func (uwt *UTLSClientWrappingTransport) Configure(config []byte) error {
 	configurables := &lib.Configurables{}

@@ -14,17 +14,12 @@ func SetWaterDialedFD(fd int32) {
 }
 
 func water_dial(
+	_ uint32,
 	_ unsafe.Pointer, _ size,
-	_ unsafe.Pointer, _ size,
-) (fd int32) {
-	return waterDialedFD
-}
-
-// This function should be imported from the host in WASI.
-// On non-WASI platforms, it mimicks the behavior of the host
-// by returning a file descriptor of preset value.
-func water_dial_fixed() (fd int32) {
-	return waterDialedFD
+	fd unsafe.Pointer,
+) errno {
+	*(*int32)(fd) = waterDialedFD
+	return 0
 }
 
 var waterAcceptedFD int32 = -1
@@ -36,13 +31,21 @@ func SetWaterAcceptedFD(fd int32) {
 // This function should be imported from the host in WASI.
 // On non-WASI platforms, it mimicks the behavior of the host
 // by returning a file descriptor of preset value.
-func water_accept() (fd int32) {
-	return waterAcceptedFD
+func water_accept(fd unsafe.Pointer) errno {
+	*(*int32)(fd) = waterAcceptedFD
+	return 0
+}
+
+func water_get_addr_suggestion(
+	unsafe.Pointer, size,
+	unsafe.Pointer,
+) errno {
+	return 0
 }
 
 // emulate the behavior when no file descriptors are
 // ready and the timeout expires immediately.
-func poll_oneoff(_, _ unsafe.Pointer, nsubscriptions uint32, nevents unsafe.Pointer) uint32 {
+func poll_oneoff(_, _ unsafe.Pointer, nsubscriptions uint32, nevents unsafe.Pointer) errno {
 	// wait for a very short period to simulate the polling
 	time.Sleep(50 * time.Millisecond)
 	*(*uint32)(nevents) = nsubscriptions
